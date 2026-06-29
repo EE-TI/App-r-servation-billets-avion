@@ -3,7 +3,7 @@
 import { Navbar } from "@/components/Navbar";
 import { FlightSearchForm } from "@/components/FlightSearchForm";
 import { DestinationCard } from "@/components/DestinationCard";
-import { popularDestinations } from "@/lib/flight-service";
+import { popularDestinations } from "@/lib/data";
 import { motion } from "framer-motion";
 import { Shield, Clock, CreditCard, Headphones } from "lucide-react";
 
@@ -16,14 +16,14 @@ const features = [
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-slate-50">
+    <main className="min-h-screen bg-slate-50 dark:bg-dark-950">
       <Navbar transparent />
 
       {/* Hero */}
       <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary-700 via-primary-800 to-primary-900" />
         <div className="absolute inset-0 opacity-10 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2040%2040%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M0%2040L40%200H20L0%2020M40%2040V20L20%2040%22%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.1%22/%3E%3C/svg%3E')]" />
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-slate-50 to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-slate-50 dark:from-dark-950 to-transparent" />
 
         <div className="relative z-10 w-full max-w-5xl mx-auto px-4 sm:px-6 pt-24 pb-16">
           <motion.div
@@ -63,12 +63,12 @@ export default function Home() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
-              className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow"
+              className="bg-white dark:bg-dark-800 rounded-2xl p-5 sm:p-6 border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow"
             >
-              <div className="w-11 h-11 rounded-xl bg-primary-50 flex items-center justify-center mb-3">
-                <f.icon className="w-5 h-5 text-primary-600" />
+              <div className="w-11 h-11 rounded-xl bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center mb-3">
+                <f.icon className="w-5 h-5 text-primary-600 dark:text-primary-400" />
               </div>
-              <h3 className="font-bold text-sm text-slate-800">{f.title}</h3>
+              <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200">{f.title}</h3>
               <p className="text-xs text-slate-400 mt-1">{f.desc}</p>
             </motion.div>
           ))}
@@ -85,7 +85,7 @@ export default function Home() {
             className="flex items-end justify-between mb-8"
           >
             <div>
-              <h2 className="text-3xl sm:text-4xl font-black text-slate-900">
+              <h2 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white">
                 Destinations populaires
               </h2>
               <p className="text-slate-400 mt-2">
@@ -103,7 +103,7 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-900 text-white py-12 px-4 mt-16">
+      <footer className="bg-slate-900 dark:bg-dark-900 text-white py-12 px-4 mt-16 border-t border-slate-800">
         <div className="max-w-6xl mx-auto text-center">
           <p className="text-2xl font-extrabold mb-2">
             Sky<span className="text-primary-400">Voyage</span>

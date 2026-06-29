@@ -1,86 +1,153 @@
-export interface Flight {
-  id: string;
-  airline: string;
-  airlineLogo: string;
-  departureTime: string;
-  arrivalTime: string;
-  origin: string;
-  destination: string;
-  duration: string;
-  stops: number;
-  price: number;
-  class: string;
-  aircraft: string;
-  co2: number;
+import "server-only";
+import { Duffel } from "@duffel/api";
+import type { FlightOffer, SearchParams } from "./types";
+
+const USE_MOCK = !process.env.DUFFEL_ACCESS_TOKEN;
+
+const duffel = USE_MOCK
+  ? null
+  : new Duffel({ token: process.env.DUFFEL_ACCESS_TOKEN! });
+
+export async function searchFlights(params: SearchParams): Promise<FlightOffer[]> {
+  if (USE_MOCK || !duffel) {
+    return getMockFlights(params);
+  }
+  return getDuffelFlights(params);
 }
 
-const airlines = [
-  { name: "Air France", code: "AF", logo: "/airlines/air-france.svg" },
-  { name: "Lufthansa", code: "LH", logo: "/airlines/lufthansa.svg" },
-  { name: "British Airways", code: "BA", logo: "/airlines/british-airways.svg" },
-  { name: "KLM", code: "KL", logo: "/airlines/klm.svg" },
-];
+async function getDuffelFlights(params: SearchParams): Promise<FlightOffer[]> {
+  const response = await duffel!.offerRequests.create({
+    slices: [
+      {
+        origin: params.origin,
+        destination: params.destination,
+        departure_date: params.date || new Date().toISOString().split("T")[0],
+        departure_time: null,
+        arrival_time: null,
+      },
+    ],
+    passengers: Array.from({ length: params.passengers || 1 }, () => ({ type: "adult" as const })),
+    cabin_class: (params.cabinClass as "economy") || "economy",
+  });
 
-const aircrafts = ["Airbus A320", "Boeing 737", "Airbus A350", "Boeing 787"];
+  const offers = response.data.offers || [];
 
-function pad(n: number) {
-  return String(n).padStart(2, "0");
+  return offers.slice(0, 20).map((offer): FlightOffer => {
+    const slice = offer.slices[0];
+    const firstSeg = slice.segments[0];
+    const lastSeg = slice.segments[slice.segments.length - 1];
+
+    return {
+      id: offer.id,
+      airline: {
+        name: firstSeg.operating_carrier.name,
+        iataCode: firstSeg.operating_carrier.iata_code || "",
+        logoUrl: firstSeg.operating_carrier.logo_symbol_url || undefined,
+      },
+      departure: {
+        airport: firstSeg.origin.iata_code || params.origin,
+        at: firstSeg.departing_at,
+      },
+      arrival: {
+        airport: lastSeg.destination.iata_code || params.destination,
+        at: lastSeg.arriving_at,
+      },
+      durationMinutes: parseDuffelDuration(slice.duration || "PT0H"),
+      stops: slice.segments.length - 1,
+      price: {
+        amount: parseFloat(offer.total_amount),
+        currency: offer.total_currency,
+      },
+      cabinClass: (firstSeg.passengers?.[0]?.cabin_class || "economy") as FlightOffer["cabinClass"],
+      co2Kg: offer.total_emissions_kg ? parseFloat(offer.total_emissions_kg) : undefined,
+    };
+  }).sort((a, b) => a.price.amount - b.price.amount);
 }
 
-export async function getFlights(
-  origin: string,
-  destination: string,
-): Promise<Flight[]> {
-  await new Promise((resolve) => setTimeout(resolve, 1200));
+function parseDuffelDuration(iso: string): number {
+  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
+  if (!match) return 0;
+  return (parseInt(match[1] || "0") * 60) + parseInt(match[2] || "0");
+}
+
+async function getMockFlights(params: SearchParams): Promise<FlightOffer[]> {
+  await new Promise((resolve) => setTimeout(resolve, 800));
+
+  const airlines = [
+    { name: "Air France", iataCode: "AF" },
+    { name: "Lufthansa", iataCode: "LH" },
+    { name: "British Airways", iataCode: "BA" },
+    { name: "KLM", iataCode: "KL" },
+  ];
+
+  const baseDate = params.date || new Date().toISOString().split("T")[0];
 
   return Array.from({ length: 10 }).map((_, i) => {
     const airline = airlines[Math.floor(Math.random() * airlines.length)];
     const depHour = 5 + Math.floor(Math.random() * 16);
     const depMin = Math.random() > 0.5 ? 0 : 30;
-    const durationH = 1 + Math.floor(Math.random() * 10);
-    const durationM = Math.random() > 0.5 ? 15 : 45;
-    const arrHour = (depHour + durationH + (depMin + durationM >= 60 ? 1 : 0)) % 24;
-    const arrMin = (depMin + durationM) % 60;
+    const durationMin = 60 + Math.floor(Math.random() * 600);
+    const arrDate = new Date(`${baseDate}T${String(depHour).padStart(2, "0")}:${String(depMin).padStart(2, "0")}:00`);
+    arrDate.setMinutes(arrDate.getMinutes() + durationMin);
     const stops = Math.random() > 0.6 ? (Math.random() > 0.7 ? 2 : 1) : 0;
 
     return {
-      id: `${airline.code}-${1000 + i}`,
-      airline: airline.name,
-      airlineLogo: airline.logo,
-      departureTime: `${pad(depHour)}:${pad(depMin)}`,
-      arrivalTime: `${pad(arrHour)}:${pad(arrMin)}`,
-      origin: origin.toUpperCase(),
-      destination: destination.toUpperCase(),
-      duration: `${durationH}h ${pad(durationM)}`,
+      id: `${airline.iataCode}-${1000 + i}`,
+      airline: {
+        name: airline.name,
+        iataCode: airline.iataCode,
+        logoUrl: `/airlines/${airline.name.toLowerCase().replace(/ /g, "-")}.svg`,
+      },
+      departure: {
+        airport: params.origin.toUpperCase(),
+        at: `${baseDate}T${String(depHour).padStart(2, "0")}:${String(depMin).padStart(2, "0")}:00`,
+      },
+      arrival: {
+        airport: params.destination.toUpperCase(),
+        at: arrDate.toISOString().replace("Z", ""),
+      },
+      durationMinutes: durationMin,
       stops,
-      price: 49 + Math.floor(Math.random() * 750),
-      class: "Économique",
-      aircraft: aircrafts[Math.floor(Math.random() * aircrafts.length)],
-      co2: 50 + Math.floor(Math.random() * 200),
+      price: {
+        amount: 49 + Math.floor(Math.random() * 750),
+        currency: "EUR",
+      },
+      cabinClass: "economy" as const,
+      aircraft: ["Airbus A320", "Boeing 737", "Airbus A350", "Boeing 787"][Math.floor(Math.random() * 4)],
+      co2Kg: 50 + Math.floor(Math.random() * 200),
     };
-  }).sort((a, b) => a.price - b.price);
+  }).sort((a, b) => a.price.amount - b.price.amount);
 }
 
-export const popularDestinations = [
-  { city: "Paris", country: "France", code: "CDG", emoji: "🇫🇷", gradient: "from-rose-400 to-orange-300" },
-  { city: "Tokyo", country: "Japon", code: "NRT", emoji: "🇯🇵", gradient: "from-pink-500 to-purple-500" },
-  { city: "New York", country: "États-Unis", code: "JFK", emoji: "🇺🇸", gradient: "from-blue-500 to-cyan-400" },
-  { city: "Barcelone", country: "Espagne", code: "BCN", emoji: "🇪🇸", gradient: "from-amber-400 to-red-500" },
-  { city: "Dubaï", country: "Émirats", code: "DXB", emoji: "🇦🇪", gradient: "from-emerald-400 to-teal-500" },
-  { city: "Rome", country: "Italie", code: "FCO", emoji: "🇮🇹", gradient: "from-indigo-500 to-violet-500" },
-];
+export async function createOrder(offerId: string, passenger: { firstName: string; lastName: string; email: string; phone?: string }): Promise<{ orderId: string; bookingRef: string }> {
+  if (USE_MOCK || !duffel) {
+    await new Promise((r) => setTimeout(r, 1500));
+    return {
+      orderId: `mock-${crypto.randomUUID().slice(0, 8)}`,
+      bookingRef: `SKV-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+    };
+  }
 
-export const airports = [
-  { code: "CDG", city: "Paris", name: "Charles de Gaulle" },
-  { code: "ORY", city: "Paris", name: "Orly" },
-  { code: "JFK", city: "New York", name: "John F. Kennedy" },
-  { code: "LHR", city: "Londres", name: "Heathrow" },
-  { code: "NRT", city: "Tokyo", name: "Narita" },
-  { code: "BCN", city: "Barcelone", name: "El Prat" },
-  { code: "DXB", city: "Dubaï", name: "International" },
-  { code: "FCO", city: "Rome", name: "Fiumicino" },
-  { code: "FRA", city: "Francfort", name: "Frankfurt" },
-  { code: "AMS", city: "Amsterdam", name: "Schiphol" },
-  { code: "YUL", city: "Montréal", name: "Trudeau" },
-  { code: "YYZ", city: "Toronto", name: "Pearson" },
-];
+  const order = await duffel!.orders.create({
+    type: "instant",
+    selected_offers: [offerId],
+    payments: [{ type: "balance", amount: "0", currency: "EUR" }],
+    passengers: [
+      {
+        id: "pas_0",
+        given_name: passenger.firstName,
+        family_name: passenger.lastName,
+        email: passenger.email,
+        phone_number: passenger.phone || "",
+        born_on: "1990-01-01",
+        title: "mr",
+        gender: "m",
+      },
+    ],
+  });
+
+  return {
+    orderId: order.data.id,
+    bookingRef: order.data.booking_reference || order.data.id,
+  };
+}
