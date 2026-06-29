@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 40" fill="none">
+  <text x="5" y="28" font-family="sans-serif" font-weight="bold" font-size="16" fill="#002157">AIR FRANCE</text>
+  <path d="M85 5 L95 20 L85 20Z" fill="#E4002B"/>
+  <path d="M85 20 L95 20 L85 35Z" fill="#002157"/>
+</svg>
