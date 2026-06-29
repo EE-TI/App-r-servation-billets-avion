@@ -6,3 +6,4 @@ dist
 !.env.example
 *.tsbuildinfo
 next-env.d.ts
+test-results/
