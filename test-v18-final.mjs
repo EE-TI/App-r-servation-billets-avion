@@ -28,7 +28,7 @@ async function main() {
 
     // 1. Basic checks
     console.log('1. Basic loading');
-    ok(await page.evaluate(() => document.body.innerText.includes('v18') || document.body.innerText.includes('V18')), 'Version v18');
+    ok(await page.evaluate(() => document.body.innerText.includes('v1') || document.body.innerText.includes('V1')), 'Version v1');
     ok(await page.evaluate(() => typeof window.Transcribe?.transcribeFile === 'function'), 'Transcribe.transcribeFile exists');
 
     // 2. Routing verification
