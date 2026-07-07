@@ -159,13 +159,13 @@ async function main() {
     const routing = await page.evaluate(() => {
       const MAX = 25 * 1024 * 1024;
       function route(name, type, size) {
-        const isNative = ['.mp3','.mp4','.mpeg','.mpga','.m4a','.wav','.webm','.flac','.ogg','.oga']
-          .some(e => name.endsWith(e));
         const isMp3 = /\.mp3$/i.test(name) || /audio\/(mpeg|mp3)/.test(type);
         const isMp4OrVideo = /\.(mp4|m4a|webm|mov|avi|mkv)$/i.test(name) || /^(video\/|audio\/mp4|audio\/x-m4a)/.test(type);
+        if (isMp4OrVideo) return 'video-extract';
+        const isNative = ['.mp3','.mp4','.mpeg','.mpga','.m4a','.wav','.webm','.flac','.ogg','.oga']
+          .some(e => name.endsWith(e));
         if (size <= MAX && isNative) return 'direct';
         if (isMp3 && size > MAX) return 'mp3-chunk';
-        if (isMp4OrVideo && size > MAX) return 'video-extract';
         return 'classic-decode';
       }
       return {
@@ -177,8 +177,9 @@ async function main() {
       };
     });
     for (const [k, v] of Object.entries(routing)) console.log(`    ${k} → ${v}`);
-    ok(routing['video.mp4 (15MB)'] === 'direct', 'Small MP4 → direct');
+    ok(routing['video.mp4 (15MB)'] === 'video-extract', 'Small MP4 → video-extract (always extract audio)');
     ok(routing['video.mp4 (50MB)'] === 'video-extract', 'Large MP4 → video-extract');
+    ok(routing['recording.m4a (20MB)'] === 'video-extract', 'M4A → video-extract');
 
     // ============================================================
     // TEST 4: No forced language
@@ -292,15 +293,17 @@ async function main() {
     console.log('  ✓ HALLUCINATION error shows user-friendly message');
     console.log('  ✓ temperature=0 on all Whisper calls');
     console.log('');
-    console.log('WHAT HAPPENS NOW:');
-    console.log('  1. Whisper receives the raw file (direct upload for <25MB)');
-    console.log('  2. temperature=0 reduces hallucination likelihood');
-    console.log('  3. If Whisper hallucinates → retry with language=en');
-    console.log('  4. If still hallucinates → retry with language=fr');
-    console.log('  5. If still hallucinates → retry bare (no extras)');
-    console.log('  6. If ALL retries hallucinate → show clear error to user');
-    console.log('  7. Transcript can be mixed EN/FR (user\'s request)');
-    console.log('  8. Other AI cards already generate in French from the transcript');
+    console.log('VIDEO TRANSCRIPTION PIPELINE (3 tentatives):');
+    console.log('  Tentative 1: decodeAudioData → WAV → Whisper');
+    console.log('    - Amplitude check: skips if silence detected');
+    console.log('    - callWhisper has hallucination retry (en→fr→empty)');
+    console.log('  Tentative 2: <video> + MediaRecorder at 4x → WebM → Whisper');
+    console.log('  Tentative 3: Direct upload of raw file → Whisper');
+    console.log('    - transcribeDirectly has 3 retries (en, fr, bare)');
+    console.log('  After all 3 fail → clear error to user');
+    console.log('');
+    console.log('  Transcript can be mixed EN/FR (user\'s request)');
+    console.log('  Other AI cards generate in French from the transcript');
 
   } catch (e) {
     console.error(`\nTest error: ${e.message}`);
